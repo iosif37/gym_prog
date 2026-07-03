@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gym Tracker</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #111;
+            color: #eee;
+            margin: 0;
+            padding: 16px;
+            max-width: 480px;
+            margin-inline: auto;
+        }
+        h1 {
+            font-size: 1.4rem;
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            font-size: 0.85rem;
+            color: #aaa;
+            margin-bottom: 6px;
+            margin-top: 18px;
+        }
+        .exercise-scroll {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding-bottom: 8px;
+            -webkit-overflow-scrolling: touch;
+        }
+        .exercise-chip {
+            flex: 0 0 auto;
+            padding: 10px 16px;
+            border-radius: 20px;
+            background: #222;
+            border: 1px solid #333;
+            color: #eee;
+            font-size: 0.95rem;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+        .exercise-chip.selected {
+            background: #3d7eff;
+            border-color: #3d7eff;
+            color: #fff;
+        }
+        input[type="number"] {
+            width: 100%;
+            padding: 14px;
+            font-size: 1.1rem;
+            border-radius: 10px;
+            border: 1px solid #333;
+            background: #1a1a1a;
+            color: #eee;
+        }
+        .row {
+            display: flex;
+            gap: 12px;
+        }
+        .row > div {
+            flex: 1;
+        }
+        button {
+            width: 100%;
+            padding: 16px;
+            margin-top: 28px;
+            font-size: 1.05rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 10px;
+            background: #3d7eff;
+            color: #fff;
+            cursor: pointer;
+        }
+        button:active {
+            background: #2a5fd6;
+        }
+        .status {
+            margin-top: 16px;
+            font-size: 0.9rem;
+            color: #7fd67f;
+            min-height: 1.2em;
+        }
+        .status.error {
+            color: #ff6b6b;
+        }
+    </style>
+</head>
+<body>
+    <h1>Log a set</h1>
+
+    <label>Exercise</label>
+    <div class="exercise-scroll" id="exerciseScroll"></div>
+
+    <label>Weight (kg)</label>
+    <input type="number" id="weight" step="0.5" inputmode="decimal">
+
+    <div class="row">
+        <div>
+            <label>Reps</label>
+            <input type="number" id="reps" inputmode="numeric">
+        </div>
+        <div>
+            <label>Set #</label>
+            <input type="number" id="setNumber" inputmode="numeric" value="1">
+        </div>
+    </div>
+
+    <button onclick="submitSet()">Log set</button>
+    <div class="status" id="status"></div>
+
+    <script>
+        let selectedExerciseId = null;
+
+        async function loadExercises() {
+            const res = await fetch("/exercises");
+            const exercises = await res.json();
+            const container = document.getElementById("exerciseScroll");
+            container.innerHTML = "";
+            exercises.forEach((ex, i) => {
+                const chip = document.createElement("div");
+                chip.className = "exercise-chip";
+                chip.textContent = ex.name;
+                chip.onclick = () => selectExercise(ex.id, chip);
+                container.appendChild(chip);
+                if (i === 0) selectExercise(ex.id, chip);
+            });
+        }
+
+        function selectExercise(id, chipEl) {
+            selectedExerciseId = id;
+            document.querySelectorAll(".exercise-chip").forEach(c => c.classList.remove("selected"));
+            chipEl.classList.add("selected");
+        }
+
+        async function submitSet() {
+            const statusEl = document.getElementById("status");
+            const weight = parseFloat(document.getElementById("weight").value);
+            const reps = parseInt(document.getElementById("reps").value);
+            const setNumber = parseInt(document.getElementById("setNumber").value);
+
+            if (!selectedExerciseId || isNaN(weight) || isNaN(reps) || isNaN(setNumber)) {
+                statusEl.textContent = "Fill in all fields.";
+                statusEl.className = "status error";
+                return;
+            }
+
+            const res = await fetch("/sets", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    exercise_id: selectedExerciseId,
+                    weight: weight,
+                    reps: reps,
+                    set_number: setNumber
+                })
+            });
+
+            if (res.ok) {
+                statusEl.textContent = "Set logged.";
+                statusEl.className = "status";
+                document.getElementById("setNumber").value = setNumber + 1;
+                // weight/reps stay filled in, since your next set is often similar
+            } else {
+                statusEl.textContent = "Something went wrong.";
+                statusEl.className = "status error";
+            }
+        }
+
+        loadExercises();
+    </script>
+</body>
+</html>
